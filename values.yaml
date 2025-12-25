@@ -1,11 +1,6 @@
 namespace: spring-petclinic
 createNamespace: true
 
-# Kiali configuration
-kiali:
-  namespace: istio-system
-  serviceType: NodePort
-
 # Global image settings
 imageRegistry: tienminhktvn2
 imagePullPolicy: Always
@@ -133,6 +128,18 @@ services:
         value: "None"
       - name: AZURE_OPENAI_ENDPOINT
         value: "None"
+
+# Configuration for all metrics, and mesh visualization tools
+observability:
+  # Kiali configuration
+  kiali:
+    namespace: istio-system
+    serviceType: NodePort
+
+  # Prometheus configuration
+  prometheus:
+    namespace: istio-system
+    serviceType: NodePort
 
 # Ingress global settings
 ingress:

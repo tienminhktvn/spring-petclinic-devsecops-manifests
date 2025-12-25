@@ -19,4 +19,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: kiali
-  namespace: {{ $.Values.kiali.namespace }}
+  namespace: {{ .Values.observability.kiali.namespace }}

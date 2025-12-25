@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kiali
-  namespace: {{ $.Values.kiali.namespace }}
+  namespace: {{ .Values.observability.kiali.namespace }}
   labels:
     
     helm.sh/chart: kiali-server-2.12.0
