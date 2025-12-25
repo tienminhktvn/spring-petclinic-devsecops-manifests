@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.hostname.adminServer.name }}
+  labels:
+    app: {{ .Values.hostname.adminServer.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.hostname.adminServer.name }}
+  template:
+    metadata:
+      name: {{ .Values.hostname.adminServer.name }}
+      labels:
+        app: {{ .Values.hostname.adminServer.name }}
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecrets.name }}
+      initContainers:
+        - name: wait-for-config-server
+          image: darthcabs/tiny-tools:1
+          args:
+            - /bin/bash
+            - -c
+            - >
+              set -x;
+              while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' {{ .Values.config.configServer.url }})" != "200" ]]; do
+                echo '.'
+                sleep 15;
+              done
+        - name: wait-for-discovery-server
+          image: darthcabs/tiny-tools:1
+          args:
+            - /bin/bash
+            - -c
+            - >
+              set -x;
+              while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' {{ .Values.config.discoveryServer.url }})" != "200" ]]; do
+                echo '.'
+                sleep 15;
+              done
+      containers:
+        - name: {{ .Values.hostname.adminServer.name }}
+          image: "{{ .Values.images.adminServer.repository }}:{{ .Values.images.adminServer.tag }}"
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9090
+          env:
+            - name: CONFIG_SERVER_URL
+              value: "{{ .Values.config.configServer.url }}"
+            - name: EUREKA_INSTANCE_HOSTNAME
+              value: "{{ .Values.hostname.adminServer.name }}"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.hostname.adminServer.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  type: NodePort
+  selector:
+    app: {{ .Values.hostname.adminServer.name }}
+  ports:
+    - name: {{ .Values.hostname.adminServer.name }}-port
+      protocol: TCP
+      port: 9090
+      targetPort: 9090
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations: {}
+  name: spring-petclinic.{{ .Values.namespace }}.{{ .Values.hostname.adminServer.name }}.com
+  namespace: {{ .Values.namespace }}
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: spring-petclinic.{{ .Values.namespace }}.{{ .Values.hostname.adminServer.name }}.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.hostname.adminServer.name }}
+                port:
+                  number: 9090

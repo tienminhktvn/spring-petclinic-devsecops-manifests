@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.hostname.apiGateway.name }}
+  labels:
+    app: {{ .Values.hostname.apiGateway.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.hostname.apiGateway.name }}
+  template:
+    metadata:
+      name: {{ .Values.hostname.apiGateway.name }}
+      labels:
+        app: {{ .Values.hostname.apiGateway.name }}
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecrets.name }}
+      initContainers:
+        - name: wait-for-config-server
+          image: darthcabs/tiny-tools:1
+          args:
+            - /bin/bash
+            - -c
+            - >
+              set -x;
+              while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' {{ .Values.config.configServer.url }})" != "200" ]]; do
+                echo '.'
+                sleep 15;
+              done
+        - name: wait-for-discovery-server
+          image: darthcabs/tiny-tools:1
+          args:
+            - /bin/bash
+            - -c
+            - >
+              set -x;
+              while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' {{ .Values.config.discoveryServer.url }})" != "200" ]]; do
+                echo '.'
+                sleep 15;
+              done
+      containers:
+        - name: {{ .Values.hostname.apiGateway.name }}
+          image: "{{ .Values.images.apiGateway.repository }}:{{ .Values.images.apiGateway.tag }}"
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: CONFIG_SERVER_URL
+              value: "{{ .Values.config.configServer.url }}"
+            - name: EUREKA_INSTANCE_HOSTNAME
+              value: "{{ .Values.hostname.apiGateway.name }}"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.hostname.apiGateway.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  type: NodePort
+  selector:
+    app: {{ .Values.hostname.apiGateway.name }}
+  ports:
+    - name: {{ .Values.hostname.apiGateway.name }}-port
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations: {}
+  name: spring-petclinic.{{ .Values.namespace }}.{{ .Values.hostname.apiGateway.name }}.com
+  namespace: {{ .Values.namespace }}
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: spring-petclinic.{{ .Values.namespace }}.{{ .Values.hostname.apiGateway.name }}.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.hostname.apiGateway.name }}
+                port:
+                  number: 8080

@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.hostname.customersService.name }}
+  labels:
+    app: {{ .Values.hostname.customersService.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.hostname.customersService.name }}
+  template:
+    metadata:
+      name: {{ .Values.hostname.customersService.name }}
+      labels:
+        app: {{ .Values.hostname.customersService.name }}
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecrets.name }}
+      initContainers:
+        - name: wait-for-config-server
+          image: darthcabs/tiny-tools:1
+          args:
+            - /bin/bash
+            - -c
+            - >
+              set -x;
+              while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' {{ .Values.config.configServer.url }})" != "200" ]]; do
+                echo '.'
+                sleep 15;
+              done
+        - name: wait-for-discovery-server
+          image: darthcabs/tiny-tools:1
+          args:
+            - /bin/bash
+            - -c
+            - >
+              set -x;
+              while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' {{ .Values.config.discoveryServer.url }})" != "200" ]]; do
+                echo '.'
+                sleep 15;
+              done
+      containers:
+        - name: {{ .Values.hostname.customersService.name }}
+          image: "{{ .Values.images.customersService.repository }}:{{ .Values.images.customersService.tag }}"
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8081
+          env:
+            - name: CONFIG_SERVER_URL
+              value: "{{ .Values.config.configServer.url }}"
+            - name: EUREKA_INSTANCE_HOSTNAME
+              value: "{{ .Values.hostname.customersService.name }}"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.hostname.customersService.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: {{ .Values.hostname.customersService.name }}
+  ports:
+    - name: {{ .Values.hostname.customersService.name }}-port
+      protocol: TCP
+      port: 8081
+      targetPort: 8081

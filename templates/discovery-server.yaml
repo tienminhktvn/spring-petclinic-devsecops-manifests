@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.hostname.discoveryServer.name }}
+  labels:
+    app: {{ .Values.hostname.discoveryServer.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.hostname.discoveryServer.name }}
+  template:
+    metadata:
+      name: {{ .Values.hostname.discoveryServer.name }}
+      labels:
+        app: {{ .Values.hostname.discoveryServer.name }}
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecrets.name }}
+      initContainers:
+        - name: wait-for-config-server
+          image: darthcabs/tiny-tools:1
+          args:
+            - /bin/bash
+            - -c
+            - >
+              set -x;
+              while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' {{ .Values.config.configServer.url }})" != "200" ]]; do
+                echo '.'
+                sleep 15;
+              done
+      containers:
+        - name: {{ .Values.hostname.discoveryServer.name }}
+          image: "{{ .Values.images.discoveryServer.repository }}:{{ .Values.images.discoveryServer.tag }}"
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8761
+          env:
+            - name: CONFIG_SERVER_URL
+              value: "{{ .Values.config.configServer.url }}"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.hostname.discoveryServer.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: {{ .Values.hostname.discoveryServer.name }}
+  ports:
+    - name: {{ .Values.hostname.discoveryServer.name }}-port
+      protocol: TCP
+      port: 8761
+      targetPort: 8761
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations: {}
+  name: spring-petclinic.{{ .Values.namespace }}.{{ .Values.hostname.discoveryServer.name }}.com
+  namespace: {{ .Values.namespace }}
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: spring-petclinic.{{ .Values.namespace }}.{{ .Values.hostname.discoveryServer.name }}.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.hostname.discoveryServer.name }}
+                port:
+                  number: 8761

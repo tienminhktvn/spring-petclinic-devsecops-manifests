@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.hostname.genaiService.name }}
+  labels:
+    app: {{ .Values.hostname.genaiService.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.hostname.genaiService.name }}
+  template:
+    metadata:
+      name: {{ .Values.hostname.genaiService.name }}
+      labels:
+        app: {{ .Values.hostname.genaiService.name }}
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecrets.name }}
+      initContainers:
+        - name: wait-for-config-server
+          image: darthcabs/tiny-tools:1
+          args:
+            - /bin/bash
+            - -c
+            - >
+              set -x;
+              while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' {{ .Values.config.configServer.url }})" != "200" ]]; do
+                echo '.'
+                sleep 15;
+              done
+        - name: wait-for-discovery-server
+          image: darthcabs/tiny-tools:1
+          args:
+            - /bin/bash
+            - -c
+            - >
+              set -x;
+              while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' {{ .Values.config.discoveryServer.url }})" != "200" ]]; do
+                echo '.'
+                sleep 15;
+              done
+      containers:
+        - name: {{ .Values.hostname.genaiService.name }}
+          image: "{{ .Values.images.genaiService.repository }}:{{ .Values.images.genaiService.tag }}"
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8084
+          env:
+            - name: OPENAI_API_KEY
+              value: "None"
+            - name: AZURE_OPENAI_KEY
+              value: "None"
+            - name: AZURE_OPENAI_ENDPOINT
+              value: "None"
+            - name: CONFIG_SERVER_URL
+              value: "{{ .Values.config.configServer.url }}"
+            - name: EUREKA_INSTANCE_HOSTNAME
+              value: "{{ .Values.hostname.genaiService.name }}"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.hostname.genaiService.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: {{ .Values.hostname.genaiService.name }}
+  ports:
+    - name: {{ .Values.hostname.genaiService.name }}-port
+      protocol: TCP
+      port: 8084
+      targetPort: 8084
