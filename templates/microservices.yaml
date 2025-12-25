@@ -1,0 +1,112 @@
+{{- range $serviceName, $service := .Values.services }}
+{{- if $service.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $service.name }}
+  labels:
+    app: {{ $service.name }}
+    {{- include "spring-petclinic.labels" $ | nindent 4 }}
+  namespace: {{ $.Values.namespace }}
+spec:
+  replicas: {{ $service.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ $service.name }}
+  template:
+    metadata:
+      name: {{ $service.name }}
+      labels:
+        app: {{ $service.name }}
+    spec:
+      {{- if $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml $.Values.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      {{- if or $service.initContainers.waitForConfig $service.initContainers.waitForDiscovery }}
+      initContainers:
+        {{- if $service.initContainers.waitForConfig }}
+        - name: wait-for-config-server
+          image: darthcabs/tiny-tools:1
+          args:
+            - /bin/bash
+            - -c
+            - >
+              set -x;
+              while [[ "$(curl -s -o /dev/null -w '%{http_code}' {{ $.Values.config.configServer.url }})" != "200" ]]; do
+                echo '.'
+                sleep 15;
+              done
+        {{- end }}
+        {{- if $service.initContainers.waitForDiscovery }}
+        - name: wait-for-discovery-server
+          image: darthcabs/tiny-tools:1
+          args:
+            - /bin/bash
+            - -c
+            - >
+              set -x;
+              while [[ "$(curl -s -o /dev/null -w '%{http_code}' {{ $.Values.config.discoveryServer.url }})" != "200" ]]; do
+                echo '.'
+                sleep 15;
+              done
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: {{ $service.name }}
+          image: "{{ $.Values.imageRegistry }}/{{ $service.image }}:{{ $service.tag }}"
+          imagePullPolicy: {{ $.Values.imagePullPolicy | default "Always" }}
+          ports:
+            - containerPort: {{ $service.port }}
+          env:
+            - name: CONFIG_SERVER_URL
+              value: "{{ $.Values.config.configServer.url }}"
+            {{- if $service.needsEureka }}
+            - name: EUREKA_INSTANCE_HOSTNAME
+              value: "{{ $service.name }}"
+            {{- end }}
+            {{- if $service.env }}
+            {{- toYaml $service.env | nindent 12 }}
+            {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $service.name }}
+  namespace: {{ $.Values.namespace }}
+spec:
+  {{- if $service.serviceType }}
+  type: {{ $service.serviceType }}
+  {{- end }}
+  selector:
+    app: {{ $service.name }}
+  ports:
+    - name: {{ $service.name }}-port
+      protocol: TCP
+      port: {{ $service.port }}
+      targetPort: {{ $service.port }}
+{{- if and $service.ingress $service.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations: {}
+  name: {{ $.Values.ingress.baseDomain }}.{{ $.Values.namespace }}.{{ $service.name }}.com
+  namespace: {{ $.Values.namespace }}
+spec:
+  ingressClassName: {{ $.Values.ingress.className }}
+  rules:
+    - host: {{ $.Values.ingress.baseDomain }}.{{ $.Values.namespace }}.{{ $service.name }}.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $service.name }}
+                port:
+                  number: {{ $service.port }}
+{{- end }}
+{{- end }}
+{{- end }}

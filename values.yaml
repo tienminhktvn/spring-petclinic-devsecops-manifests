@@ -1,59 +1,165 @@
-namespace: monitoring
+namespace: spring-petclinic
+createNamespace: true
 
-images:
-  genaiService:
-    repository: registry.caotienminh.software/springcommunity/spring-petclinic-genai-service
-    tag: latest
-  adminServer:
-    repository: registry.caotienminh.software/springcommunity/spring-petclinic-admin-server
-    tag: latest
-  customersService:
-    repository: registry.caotienminh.software/springcommunity/spring-petclinic-customers-service
-    tag: monitoring
-  vetsService:
-    repository: registry.caotienminh.software/springcommunity/spring-petclinic-vets-service
-    tag: monitoring
-  visitsService:
-    repository: registry.caotienminh.software/springcommunity/spring-petclinic-visits-service
-    tag: monitoring
-  apiGateway: 
-    repository: registry.caotienminh.software/springcommunity/spring-petclinic-api-gateway
-    tag: latest
-  discoveryServer:
-    repository: registry.caotienminh.software/springcommunity/spring-petclinic-discovery-server
-    tag: latest
-  configServer: 
-    repository: registry.caotienminh.software/springcommunity/spring-petclinic-config-server
-    tag: latest
-  tracingServer:
-    repository: registry.caotienminh.software/springcommunity/zipkin-server
-    tag: latest
-
+# Global image settings
+imageRegistry: tienminhktvn2
+imagePullPolicy: Always
 imagePullSecrets:
-  name: regcred
+  - name: regcred
 
+# Global configuration URLs
 config:
   discoveryServer:
     url: http://discovery-server:8761
-  configServer: 
+  configServer:
     url: http://config-server:8888
 
-hostname:
-  genaiService:
-    name: genai-service
-  adminServer:
-    name: admin-server
-  customersService:
-    name: customers-service
-  vetsService:
-    name: vets-service
-  visitsService:
-    name: visits-service
-  apiGateway: 
-    name: api-gateway
-  discoveryServer:
-    name: discovery-server
-  configServer: 
+# Service definitions
+services:
+  # Infrastructure services
+  configServer:
+    enabled: true
     name: config-server
-  tracingServer: 
+    image: spring-petclinic-config-server
+    tag: latest
+    port: 8888
+    replicas: 1
+    serviceType: ClusterIP
+    ingress:
+      enabled: true
+    initContainers:
+      waitForConfig: false
+      waitForDiscovery: false
+
+  discoveryServer:
+    enabled: true
+    name: discovery-server
+    image: spring-petclinic-discovery-server
+    tag: latest
+    port: 8761
+    replicas: 1
+    serviceType: ClusterIP
+    ingress:
+      enabled: true
+    initContainers:
+      waitForConfig: true
+      waitForDiscovery: false
+
+  # API Gateway
+  apiGateway:
+    enabled: true
+    name: api-gateway
+    image: spring-petclinic-api-gateway
+    tag: latest
+    port: 8080
+    replicas: 1
+    serviceType: NodePort
+    ingress:
+      enabled: true
+    initContainers:
+      waitForConfig: true
+      waitForDiscovery: true
+    needsEureka: true
+
+  # Business services
+  customersService:
+    enabled: true
+    name: customers-service
+    image: spring-petclinic-customers-service
+    tag: monitoring
+    port: 8081
+    replicas: 1
+    serviceType: ClusterIP
+    ingress:
+      enabled: false
+    initContainers:
+      waitForConfig: true
+      waitForDiscovery: true
+    needsEureka: true
+
+  vetsService:
+    enabled: true
+    name: vets-service
+    image: spring-petclinic-vets-service
+    tag: monitoring
+    port: 8083
+    replicas: 1
+    serviceType: ClusterIP
+    ingress:
+      enabled: false
+    initContainers:
+      waitForConfig: true
+      waitForDiscovery: true
+    needsEureka: true
+
+  visitsService:
+    enabled: true
+    name: visits-service
+    image: spring-petclinic-visits-service
+    tag: monitoring
+    port: 8082
+    replicas: 1
+    serviceType: ClusterIP
+    ingress:
+      enabled: false
+    initContainers:
+      waitForConfig: true
+      waitForDiscovery: true
+    needsEureka: true
+
+  genaiService:
+    enabled: true
+    name: genai-service
+    image: spring-petclinic-genai-service
+    tag: latest
+    port: 8084
+    replicas: 1
+    serviceType: ClusterIP
+    ingress:
+      enabled: false
+    initContainers:
+      waitForConfig: true
+      waitForDiscovery: true
+    needsEureka: true
+    env:
+      - name: OPENAI_API_KEY
+        value: "None"
+      - name: AZURE_OPENAI_KEY
+        value: "None"
+      - name: AZURE_OPENAI_ENDPOINT
+        value: "None"
+
+  # Monitoring services
+  adminServer:
+    enabled: true
+    name: admin-server
+    image: spring-petclinic-admin-server
+    tag: latest
+    port: 9090
+    replicas: 1
+    serviceType: NodePort
+    ingress:
+      enabled: true
+    initContainers:
+      waitForConfig: true
+      waitForDiscovery: true
+    needsEureka: true
+
+  tracingServer:
+    enabled: false
     name: tracing-server
+    image: zipkin-server
+    tag: latest
+    port: 9411
+    replicas: 1
+    serviceType: NodePort
+    ingress:
+      enabled: false
+    initContainers:
+      waitForConfig: false
+      waitForDiscovery: false
+
+# Ingress global settings
+ingress:
+  className: nginx
+  baseDomain: spring-petclinic
