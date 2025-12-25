@@ -108,7 +108,7 @@ services:
     needsEureka: true
 
   genaiService:
-    enabled: true
+    enabled: false
     name: genai-service
     image: spring-petclinic-genai-service
     tag: latest
