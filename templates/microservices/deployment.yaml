@@ -70,43 +70,5 @@ spec:
             {{- toYaml $service.env | nindent 12 }}
             {{- end }}
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ $service.name }}
-  namespace: {{ $.Values.namespace }}
-spec:
-  {{- if $service.serviceType }}
-  type: {{ $service.serviceType }}
-  {{- end }}
-  selector:
-    app: {{ $service.name }}
-  ports:
-    - name: {{ $service.name }}-port
-      protocol: TCP
-      port: {{ $service.port }}
-      targetPort: {{ $service.port }}
-{{- if and $service.ingress $service.ingress.enabled }}
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  annotations: {}
-  name: {{ $.Values.ingress.baseDomain }}.{{ $.Values.namespace }}.{{ $service.name }}.com
-  namespace: {{ $.Values.namespace }}
-spec:
-  ingressClassName: {{ $.Values.ingress.className }}
-  rules:
-    - host: {{ $.Values.ingress.baseDomain }}.{{ $.Values.namespace }}.{{ $service.name }}.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ $service.name }}
-                port:
-                  number: {{ $service.port }}
-{{- end }}
 {{- end }}
 {{- end }}
