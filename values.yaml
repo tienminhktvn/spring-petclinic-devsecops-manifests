@@ -29,7 +29,6 @@ services:
       enabled: true
     initContainers:
       waitForConfig: false
-      waitForDiscovery: false
 
   discoveryServer:
     enabled: true
@@ -43,7 +42,6 @@ services:
       enabled: true
     initContainers:
       waitForConfig: true
-      waitForDiscovery: false
 
   # API Gateway
   apiGateway:
@@ -58,8 +56,7 @@ services:
       enabled: true
     initContainers:
       waitForConfig: true
-      waitForDiscovery: true
-    needsEureka: true
+    needsEureka: false
 
   # Business services
   customersService:
@@ -74,8 +71,7 @@ services:
       enabled: false
     initContainers:
       waitForConfig: true
-      waitForDiscovery: true
-    needsEureka: true
+    needsEureka: false
 
   vetsService:
     enabled: true
@@ -89,8 +85,7 @@ services:
       enabled: false
     initContainers:
       waitForConfig: true
-      waitForDiscovery: true
-    needsEureka: true
+    needsEureka: false
 
   visitsService:
     enabled: true
@@ -104,30 +99,7 @@ services:
       enabled: false
     initContainers:
       waitForConfig: true
-      waitForDiscovery: true
-    needsEureka: true
-
-  genaiService:
-    enabled: false
-    name: genai-service
-    image: spring-petclinic-genai-service
-    tag: latest
-    port: 8084
-    replicas: 1
-    serviceType: NodePort
-    ingress:
-      enabled: false
-    initContainers:
-      waitForConfig: true
-      waitForDiscovery: true
-    needsEureka: true
-    env:
-      - name: OPENAI_API_KEY
-        value: "None"
-      - name: AZURE_OPENAI_KEY
-        value: "None"
-      - name: AZURE_OPENAI_ENDPOINT
-        value: "None"
+    needsEureka: false
 
 # Configuration for all metrics, and mesh visualization tools
 observability:

@@ -24,7 +24,7 @@ spec:
       imagePullSecrets:
         {{- toYaml $.Values.imagePullSecrets | nindent 8 }}
       {{- end }}
-      {{- if or $service.initContainers.waitForConfig $service.initContainers.waitForDiscovery }}
+      {{- if or $service.initContainers.waitForConfig }}
       initContainers:
         {{- if $service.initContainers.waitForConfig }}
         - name: wait-for-config-server
@@ -35,19 +35,6 @@ spec:
             - >
               set -x;
               while [[ "$(curl -s -o /dev/null -w '%{http_code}' {{ $.Values.config.configServer.url }})" != "200" ]]; do
-                echo '.'
-                sleep 15;
-              done
-        {{- end }}
-        {{- if $service.initContainers.waitForDiscovery }}
-        - name: wait-for-discovery-server
-          image: darthcabs/tiny-tools:1
-          args:
-            - /bin/bash
-            - -c
-            - >
-              set -x;
-              while [[ "$(curl -s -o /dev/null -w '%{http_code}' {{ $.Values.config.discoveryServer.url }})" != "200" ]]; do
                 echo '.'
                 sleep 15;
               done
